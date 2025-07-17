@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Cyberpunk color scheme with neon purple accents */
+
+@layer base {
+  :root {
+    --background: 220 27% 8%;
+    --foreground: 271 100% 80%;
+
+    --card: 220 27% 12%;
+    --card-foreground: 271 100% 90%;
+
+    --popover: 220 27% 12%;
+    --popover-foreground: 271 100% 90%;
+
+    --primary: 271 100% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 27% 16%;
+    --secondary-foreground: 271 100% 90%;
+
+    --muted: 220 27% 16%;
+    --muted-foreground: 271 30% 70%;
+
+    --accent: 271 100% 40%;
+    --accent-foreground: 271 100% 90%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 271 50% 30%;
+    --input: 220 27% 16%;
+    --ring: 271 100% 60%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animations */
+@keyframes glow-purple {
+  0%, 100% { 
+    text-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #a855f7, 0 0 40px #a855f7;
+    color: #a855f7;
+  }
+  50% { 
+    text-shadow: 0 0 20px #a855f7, 0 0 30px #a855f7, 0 0 40px #a855f7, 0 0 60px #a855f7;
+    color: #c084fc;
+  }
+}
+
+@keyframes pulse-border-purple {
+  0%, 100% { 
+    border-color: #a855f7; /* Tailwind purple-400 */
+    box-shadow: 0 0 5px #a855f7;
+  }
+  50% { 
+    border-color: #c4b5fd; /* Tailwind violet-300 */
+    box-shadow: 0 0 15px #c4b5fd;
+  }
+}
+
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes data-flow {
+  0% { transform: translateX(-100%) translateY(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100vw) translateY(100vh); opacity: 0; }
+}
+
+.glow-text-purple {
+  animation: glow-purple 2s ease-in-out infinite;
+}
+
+.pulse-border-purple {
+  animation: pulse-border-purple 2s ease-in-out infinite;
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.data-flow {
+  animation: data-flow 8s linear infinite;
+}
+
+/* Glassmorphism effects */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-purple {
+  background: rgba(147, 51, 234, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+}
