@@ -23,6 +23,9 @@ A Python-powered OSINT (Open Source Intelligence) tool to search for people or e
 - `google-api-python-client`
 - `google-generativeai`
 - `python-dotenv`
+- 'React.js'
+- 'Express.js'
+- 'Node.js'
 
 ---
 
