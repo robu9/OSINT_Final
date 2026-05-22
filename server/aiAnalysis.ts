@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type GenerateContentResult } from "@google/generative-ai";
 import type { AiAnalysisResult, SearchResult } from "./types.js";
 
 const DEFAULT_MODEL = "gemma-4-31b-it";
@@ -19,6 +19,31 @@ export function getModelName(): string {
   return modelName;
 }
 
+function extractModelText(resp: GenerateContentResult): string {
+  const parts = resp.response.candidates?.[0]?.content?.parts;
+  if (!parts?.length) return resp.response.text();
+
+  const answerParts = parts.filter(
+    (part): part is { text: string; thought?: boolean } =>
+      typeof (part as { text?: string }).text === "string" && !(part as { thought?: boolean }).thought
+  );
+
+  if (answerParts.length > 0) {
+    return answerParts.map((part) => part.text).join("");
+  }
+
+  return resp.response.text();
+}
+
+function isRetryableApiError(error: unknown): boolean {
+  const status = (error as { status?: number }).status;
+  return status === 429 || status === 500 || status === 503;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function fallbackAiResponse(): AiAnalysisResult {
   return {
     short_summary:
@@ -36,33 +61,82 @@ function fallbackAiResponse(): AiAnalysisResult {
   };
 }
 
-function parseAiResponse(jsonStr: string): AiAnalysisResult {
+function mapAiData(data: Record<string, unknown>): AiAnalysisResult {
+  return {
+    short_summary: String(data.short_summary || ""),
+    detailed_summary: String(data.detailed_summary || ""),
+    riskAnalysis: {
+      riskScore: Number(data.riskScore) || 0,
+      riskJustification: String(data.riskJustification || ""),
+      sentimentScore: Number(data.sentimentScore) || 0,
+      sentimentJustification: String(data.sentimentJustification || ""),
+    },
+    keyFindings: Array.isArray(data.keyFindings)
+      ? data.keyFindings.map(String)
+      : [],
+    associatedEntities: Array.isArray(data.associatedEntities)
+      ? (data.associatedEntities as Array<Record<string, string>>).map((e) => ({
+          name: String(e.name || ""),
+          type: String(e.type || ""),
+          relationship: String(e.relationship || ""),
+        }))
+      : [],
+  };
+}
+
+function isValidAiResult(result: AiAnalysisResult): boolean {
+  return Boolean(result.short_summary && !result.short_summary.startsWith("An error occurred during AI analysis"));
+}
+
+function parseAiResponse(jsonStr: string): AiAnalysisResult | null {
   try {
     const data = JSON.parse(jsonStr) as Record<string, unknown>;
-    return {
-      short_summary: String(data.short_summary || ""),
-      detailed_summary: String(data.detailed_summary || ""),
-      riskAnalysis: {
-        riskScore: Number(data.riskScore) || 0,
-        riskJustification: String(data.riskJustification || ""),
-        sentimentScore: Number(data.sentimentScore) || 0,
-        sentimentJustification: String(data.sentimentJustification || ""),
-      },
-      keyFindings: Array.isArray(data.keyFindings)
-        ? data.keyFindings.map(String)
-        : [],
-      associatedEntities: Array.isArray(data.associatedEntities)
-        ? (data.associatedEntities as Array<Record<string, string>>).map((e) => ({
-            name: String(e.name || ""),
-            type: String(e.type || ""),
-            relationship: String(e.relationship || ""),
-          }))
-        : [],
-    };
+    return mapAiData(data);
   } catch (error) {
     console.warn("Failed to parse AI JSON:", error);
-    return fallbackAiResponse();
+    return null;
   }
+}
+
+function extractJsonObject(text: string): string | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  const end = text.lastIndexOf("}");
+  return end > start ? text.slice(start, end + 1) : null;
 }
 
 function cleanJsonResponse(text: string): string {
@@ -71,6 +145,19 @@ function cleanJsonResponse(text: string): string {
   if (cleaned.startsWith("```")) cleaned = cleaned.slice(3);
   if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
   return cleaned.trim();
+}
+
+function tryParseAiResponse(text: string): AiAnalysisResult | null {
+  const candidates = [text, cleanJsonResponse(text), extractJsonObject(text)].filter(
+    (value): value is string => Boolean(value?.trim())
+  );
+
+  for (const candidate of [...new Set(candidates)]) {
+    const parsed = parseAiResponse(candidate);
+    if (parsed && isValidAiResult(parsed)) return parsed;
+  }
+
+  return null;
 }
 
 function buildAnalysisPrompt(name: string, city: string, snippets: string[]): string {
@@ -104,7 +191,7 @@ Intelligence snippets (${snippets.length} items, ranked by relevance):
 ${joined}
 ---
 
-Respond ONLY with valid JSON. No markdown fences.`;
+CRITICAL: Your entire response must be a single raw JSON object. No markdown, no bullet points, no prose before or after the JSON.`;
 }
 
 export async function gemmaAnalyzeResults(
@@ -123,6 +210,9 @@ export async function gemmaAnalyzeResults(
   });
 
   const prompt = buildAnalysisPrompt(name, city, snippets);
+  const retryPrompt = `${prompt}
+
+REMINDER: Your previous response was rejected because it was not valid JSON. Output ONLY the JSON object starting with { and ending with }. No markdown, no asterisks, no headings.`;
 
   for (let keyIdx = 0; keyIdx < geminiKeys.length; keyIdx++) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -131,27 +221,28 @@ export async function gemmaAnalyzeResults(
         const model = genAI.getGenerativeModel({
           model: modelName,
           generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
+            temperature: attempt === 0 ? 0.2 : 0,
           },
         });
 
-        const resp = await model.generateContent(prompt);
-        const txt = cleanJsonResponse(resp.response.text());
-        console.log(`Gemma (${modelName}) responded (${txt.length} chars) with key #${keyIdx + 1}`);
+        const resp = await model.generateContent(attempt === 0 ? prompt : retryPrompt);
+        const raw = extractModelText(resp);
+        console.log(`Gemma (${modelName}) responded (${raw.length} chars) with key #${keyIdx + 1}`);
 
-        const parsed = parseAiResponse(txt);
-        if (parsed.short_summary) return parsed;
+        const parsed = tryParseAiResponse(raw);
+        if (parsed) return parsed;
 
-        const jsonStart = txt.indexOf("{");
-        const jsonEnd = txt.lastIndexOf("}") + 1;
-        if (jsonStart !== -1 && jsonEnd > jsonStart) {
-          const extracted = parseAiResponse(txt.slice(jsonStart, jsonEnd));
-          if (extracted.short_summary) return extracted;
-        }
+        console.warn(
+          `Gemma key #${keyIdx + 1}, attempt #${attempt + 1}: response was not valid JSON`,
+          raw.slice(0, 200)
+        );
       } catch (error) {
         console.error(`Gemma key #${keyIdx + 1}, attempt #${attempt + 1} failed:`, error);
-        await new Promise((r) => setTimeout(r, 1000));
+        if (isRetryableApiError(error)) {
+          await sleep(1500 * (attempt + 1));
+        } else {
+          await sleep(1000);
+        }
       }
     }
   }
@@ -190,11 +281,13 @@ ${listing}`;
       const genAI = new GoogleGenerativeAI(key);
       const model = genAI.getGenerativeModel({
         model: modelName,
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+        generationConfig: { temperature: 0.1 },
       });
 
       const resp = await model.generateContent(prompt);
-      const parsed = JSON.parse(cleanJsonResponse(resp.response.text())) as {
+      const raw = extractModelText(resp);
+      const extracted = extractJsonObject(raw) ?? cleanJsonResponse(raw);
+      const parsed = JSON.parse(extracted) as {
         keep?: number[];
       };
 
