@@ -1,98 +1,129 @@
 
 # OSINT Investigator
 
-A Python-powered OSINT (Open Source Intelligence) tool to search for people or entities on the web, aggregate results, extract named entities using NLP, and generate AI-powered summaries using Google Gemini.
+A TypeScript-powered OSINT (Open Source Intelligence) platform to search for people on the web, aggregate multi-source results, score relevance with NLP + fuzzy matching, and generate AI-powered intelligence reports using **Gemma 4 31B**.
 
 ---
 
-## 🚀 Features
+## Features
 
-- 🌐 Searches web sources via Google Custom Search API  
-- 📝 Extracts entities (person, org, location) using SpaCy  
-- 🤖 Generates investigation summaries using Gemini (Generative AI)  
-- 📦 Saves filtered, enriched results as JSON  
-- 🔍 Supports multiple search types (LinkedIn, news/case, general web)
-
----
-
-## ⚙️ Tech Stack
-
-- **Python 3.10+**
-- `requests`
-- `spacy` with `en_core_web_sm`
-- `google-api-python-client`
-- `google-generativeai`
-- `python-dotenv`
-- 'React.js'
-- 'Express.js'
-- 'Node.js'
+- Multi-source Google Custom Search across 12 targeted query types (LinkedIn, legal/news, social, business, academic, government, etc.)
+- Parallel search execution with pagination for broader coverage
+- Advanced relevance scoring (exact match, fuzzy match, NLP entities, domain trust, city/extra-term context)
+- AI re-ranking and analysis with **Gemma 4 31B** (`gemma-4-31b-it`)
+- Profile metadata extraction, entity relationship mapping, and evidence timelines
+- React frontend with rich intelligence dashboard and downloadable JSON reports
 
 ---
 
-## 💻 How it Works!
+## Tech Stack
 
-1️⃣ You enter: `Name`, `City`, and optional `Extra terms`  
-2️⃣ The tool runs:
-- `site:linkedin.com/in` search  
-- `news/case` search (e.g., NDTV, The Hindu, Bar & Bench)  
-- general web search  
-
-3️⃣ It enriches results with:
-- NLP entity recognition (person/org names, places)  
-- Gemini-generated summary per result  
-
-4️⃣ Results are saved as a JSON file with all findings.
+- **Runtime:** Node.js, Express, TypeScript
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS, shadcn/ui
+- **AI:** Google Gemini API with Gemma 4 31B
+- **Search:** Google Custom Search API
+- **NLP:** compromise (lightweight entity extraction)
+- **Matching:** fuzzball (fuzzy string matching)
 
 ---
 
-## 📂 Installation
+## How It Works
+
+1. Enter **Name**, **City/Region**, and optional **Extra terms**
+2. Server runs 12+ advanced search queries in parallel
+3. Results are deduplicated, NLP-enriched, and scored for relevance
+4. Gemma 4 31B re-ranks candidates and generates the intelligence report
+5. UI displays risk assessment, findings, entities, timeline, and raw data
+
+---
+
+## Installation
 
 ```bash
-# Clone repo
 git clone https://github.com/yourusername/osint-investigator.git
 cd osint-investigator
 
-# (Optional) Create virtual environment
-python -m venv osint_env
-osint_env\Scripts\activate  # On Windows
-
-# Install dependencies
-pip install -r requirements.txt
+npm install
 ```
 
 ---
 
-## 🔑 Setup
+## Setup
 
-1️⃣ Get your **Google API key** + **CSE ID** → [Google Custom Search](https://programmablesearchengine.google.com/)  
-2️⃣ Get your **Gemini API key** → [Google AI Studio](https://makersuite.google.com/app/apikey)
+1. Get **Google API key** + **CSE ID** → [Google Custom Search](https://programmablesearchengine.google.com/)
+2. Get **Gemini API key** → [Google AI Studio](https://aistudio.google.com/apikey)
 
-Create a `.env` file:
+Create `.env` in the project root:
+
 ```env
-GOOGLE_API_KEY=your-google-api-key
-GOOGLE_CSE_ID=your-cse-id
-GEMINI_API_KEY=your-gemini-api-key
+GOOGLE_API_KEYS=your-google-api-key
+GOOGLE_CSE_IDS=your-cse-id
+GEMINI_API_KEYS=your-gemini-api-key
+PORT=8080
+GEMMA_MODEL=gemma-4-31b-it
 ```
 
 ---
 
-## ▶️ Run
+## Run
 
 ```bash
-python osint_investigator.py
+# One command — single server serves both API and frontend
+npm run dev
+```
+
+Open http://localhost:8080 — the app and API share the same origin (`/api/...`).
+
+For production locally:
+
+```bash
+npm run build
+npm start
 ```
 
 ---
 
-## 📝 Example Command
+## Deploy to Vercel
+
+1. Push the repo to GitHub
+2. Import the project in [Vercel](https://vercel.com)
+3. Add environment variables in the Vercel dashboard:
+   - `GOOGLE_API_KEYS`
+   - `GOOGLE_CSE_IDS`
+   - `GEMINI_API_KEYS`
+   - `GEMMA_MODEL` (optional, defaults to `gemma-4-31b-it`)
+4. Deploy — `vercel.json` is already configured
+
+> **Note:** OSINT searches can take 30–90 seconds. Vercel Pro allows up to 300s function duration (configured in `vercel.json`). The in-memory progress store works for a single instance; for heavy production use, consider Redis or a job queue later.
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/osint` | Start a background OSINT search |
+| GET | `/api/progress/:searchId` | Poll search progress |
+| POST | `/api/generate-report` | Generate a JSON report |
+| GET | `/api/health` | Health check |
+
+---
+
+## Project Structure
 
 ```
-Search about Yash Bahuguna, Delhi, MAIT on the web and generate a summary using the snippet and detected entities.
+├── server/          # Express API + OSINT logic
+├── src/             # React frontend
+├── api/             # Vercel serverless entry
+├── public/          # Static assets
+├── index.html       # Vite entry
+└── package.json     # Single dependency tree
 ```
 
 ---
 
-## 📌 Notes
+## Notes
 
-- Use responsibly — ensure ethical and legal compliance while performing OSINT.  
-- Be mindful of API quotas (Google CSE + Gemini).
+- Use responsibly — ensure ethical and legal compliance while performing OSINT.
+- Be mindful of API quotas (Google CSE + Gemini/Gemma).
+- Gemma 4 31B requires a valid Gemini API key with access to the model.

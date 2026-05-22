@@ -86,12 +86,17 @@ const getSentimentLabel = (score: number) => {
 const getSourceColor = (source: string) => {
   switch (source) {
     case "LinkedIn": return "bg-blue-500";
+    case "Professional": return "bg-sky-500";
+    case "Case/Legal": return "bg-amber-500";
     case "Case/News": return "bg-amber-500";
     case "Reddit": return "bg-orange-500";
     case "Wikipedia": return "bg-gray-400";
     case "Business": return "bg-teal-500";
     case "Academic": return "bg-indigo-500";
     case "Social": return "bg-pink-500";
+    case "Developer": return "bg-emerald-500";
+    case "News": return "bg-yellow-500";
+    case "Government": return "bg-slate-500";
     default: return "bg-purple-500";
   }
 };
@@ -99,12 +104,17 @@ const getSourceColor = (source: string) => {
 const getSourceIcon = (source: string) => {
   switch (source) {
     case "LinkedIn": return "🔗";
+    case "Professional": return "💼";
+    case "Case/Legal": return "⚖️";
     case "Case/News": return "📰";
     case "Reddit": return "💬";
     case "Wikipedia": return "📚";
     case "Business": return "🏢";
     case "Academic": return "🎓";
     case "Social": return "🐦";
+    case "Developer": return "👨‍💻";
+    case "News": return "📰";
+    case "Government": return "🏛️";
     default: return "🌐";
   }
 };
@@ -866,6 +876,11 @@ const SearchPage = () => {
                                   {item.matchMethod && (
                                     <span className="text-xs px-1.5 py-0.5 bg-gray-700/60 rounded text-purple-300/60">
                                       {item.matchMethod}
+                                    </span>
+                                  )}
+                                  {item.relevanceScore != null && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 rounded text-purple-300">
+                                      Score: {item.relevanceScore}
                                     </span>
                                   )}
                                 </div>

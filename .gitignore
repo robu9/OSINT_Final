@@ -5,11 +5,15 @@ __pycache__/
 # Ignore environment files
 .env
 
+# Build output
+dist/
+dist-server/
+dist-ssr/
+reports/
+
 # Ignore OS / editor files
 .DS_Store
 .vscode/
-
-# Ignore JSON output if you don’t want to track result files
 
 logs
 *.log
@@ -20,8 +24,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
 *.local
 
 # Editor directories and files
@@ -34,4 +36,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
