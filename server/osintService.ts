@@ -1,7 +1,10 @@
 import {
   buildAdvancedQueries,
+  buildFollowUpQueries,
+  getGeoCodeForCity,
   runParallelSearches,
 } from "./googleSearch.js";
+import { enrichResultsWithPageContent } from "./contentFetch.js";
 import { enrichWithNlp, aggregateEntities } from "./nlp.js";
 import { filterAndRankResults } from "./filtering.js";
 import { extractProfileInfo, buildTimeline } from "./profile.js";
@@ -24,6 +27,8 @@ const SOURCE_TAGS = [
   "Developer",
   "News",
   "Government",
+  "Deep/Variant",
+  "Deep/Follow-up",
 ];
 
 function updateProgress(searchId: string, pct: number, stage: string): void {
@@ -37,15 +42,53 @@ function updateProgress(searchId: string, pct: number, stage: string): void {
 function buildSourceAnalysis(filtered: SearchResult[]): SourceAnalysis[] {
   return SOURCE_TAGS.map((name) => ({
     name,
-    count: filtered.filter((r) => r.source === name).length,
+    count: filtered.filter((r) => r.source === name || r.sourceTags?.includes(name)).length,
   }));
+}
+
+function extractFollowUpSignals(results: SearchResult[], targetName: string): {
+  organizations: string[];
+  aliases: string[];
+} {
+  const orgs = new Set<string>();
+  const aliases = new Set<string>();
+  const targetLower = targetName.toLowerCase();
+
+  for (const result of results.slice(0, 15)) {
+    for (const ent of result.entities || []) {
+      if (ent.label === "ORG" && ent.text.length >= 3) {
+        orgs.add(ent.text.trim());
+      }
+      if (ent.label === "PERSON" && ent.text.length >= 3) {
+        const personLower = ent.text.toLowerCase();
+        if (
+          personLower !== targetLower &&
+          !targetLower.includes(personLower) &&
+          !personLower.includes(targetLower)
+        ) {
+          aliases.add(ent.text.trim());
+        }
+      }
+    }
+
+    const pagemap = (result.pagemap || {}) as Record<string, Array<Record<string, string>>>;
+    for (const person of pagemap.person || []) {
+      if (person.worksfor) orgs.add(person.worksfor.trim());
+    }
+  }
+
+  return {
+    organizations: [...orgs].slice(0, 5),
+    aliases: [...aliases].slice(0, 4),
+  };
 }
 
 export async function runOsintWithProgress(
   name: string,
   city: string,
   extras: string[],
-  searchId: string
+  searchId: string,
+  deepSearch = true
 ): Promise<OsintResult> {
   name = sanitizeInput(name);
   city = sanitizeInput(city);
@@ -53,19 +96,61 @@ export async function runOsintWithProgress(
 
   if (!name) throw new Error("Name is required for OSINT search.");
 
-  console.log(`Starting OSINT for: name='${name}', city='${city}', extras='${extras.join(", ")}'`);
+  const geoCode = getGeoCodeForCity(city);
+  let totalQueries = 0;
+  let searchRounds = 1;
+  let contentEnrichedCount = 0;
 
-  updateProgress(searchId, 5, "🔍 Building advanced search queries...");
+  console.log(
+    `Starting OSINT for: name='${name}', city='${city}', extras='${extras.join(", ")}', deep=${deepSearch}`
+  );
+
+  updateProgress(searchId, 5, deepSearch ? "🔍 Building deep search query plan..." : "🔍 Building search queries...");
   await sleep(50);
 
-  const queries = buildAdvancedQueries(name, city, extras);
-  updateProgress(searchId, 12, `🌐 Running ${queries.length} targeted searches in parallel...`);
+  const round1Queries = buildAdvancedQueries(name, city, extras, deepSearch);
+  totalQueries += round1Queries.length;
 
-  const searchBatches = await runParallelSearches(queries);
-  updateProgress(searchId, 55, "🔄 Merging and deduplicating results...");
+  updateProgress(
+    searchId,
+    10,
+    `🌐 Round 1: Running ${round1Queries.length} targeted searches...`
+  );
 
-  const combined = mergeAndDedupe(searchBatches) as SearchResult[];
-  console.log(`Total unique results after merge: ${combined.length}`);
+  const round1Batches = await runParallelSearches(round1Queries, geoCode, deepSearch);
+  let combined = mergeAndDedupe(round1Batches) as SearchResult[];
+  console.log(`Round 1 unique results: ${combined.length}`);
+
+  if (deepSearch && combined.length > 0) {
+    updateProgress(searchId, 35, "🧠 Analyzing results for follow-up queries...");
+    enrichWithNlp(combined);
+    const preliminary = filterAndRankResults(combined, name, city, extras);
+    const signals = extractFollowUpSignals(preliminary, name);
+
+    const followUpQueries = buildFollowUpQueries(
+      name,
+      city,
+      extras,
+      signals.organizations,
+      signals.aliases
+    );
+
+    if (followUpQueries.length > 0) {
+      searchRounds = 2;
+      totalQueries += followUpQueries.length;
+      updateProgress(
+        searchId,
+        42,
+        `🔎 Round 2: Running ${followUpQueries.length} follow-up deep searches...`
+      );
+
+      const round2Batches = await runParallelSearches(followUpQueries, geoCode, true);
+      combined = mergeAndDedupe([combined, ...round2Batches]) as SearchResult[];
+      console.log(`After round 2 unique results: ${combined.length}`);
+    }
+  }
+
+  updateProgress(searchId, 52, "🔄 Merging and deduplicating results...");
 
   if (combined.length === 0) {
     return emptyResult(
@@ -76,10 +161,19 @@ export async function runOsintWithProgress(
     );
   }
 
-  updateProgress(searchId, 62, "🧠 Running NLP entity recognition...");
+  updateProgress(searchId, 58, "🧠 Running NLP entity recognition...");
   enrichWithNlp(combined);
 
-  updateProgress(searchId, 70, "🎯 Scoring and ranking relevance...");
+  if (deepSearch) {
+    updateProgress(searchId, 62, "📄 Fetching full page content for top results...");
+    const beforeEnrich = combined.length;
+    await enrichResultsWithPageContent(combined, 20);
+    contentEnrichedCount = combined.filter((r) => r.pageContent).length;
+    console.log(`Content enriched ${contentEnrichedCount}/${beforeEnrich} results`);
+    enrichWithNlp(combined);
+  }
+
+  updateProgress(searchId, 70, "🎯 Scoring identity relevance...");
   let filtered = filterAndRankResults(combined, name, city, extras);
 
   if (filtered.length === 0) {
@@ -87,7 +181,7 @@ export async function runOsintWithProgress(
       name,
       city,
       "No data found matching this person.",
-      "The search returned results, but none could be confidently linked to the target person. They may not have a significant public profile, or more specific search terms may be needed.",
+      "The search returned results, but none could be confidently linked to the target person. Try adding city, employer, or other keywords to disambiguate common names.",
       combined.length
     );
   }
@@ -125,7 +219,7 @@ export async function runOsintWithProgress(
   }));
 
   console.log(
-    `OSINT complete for '${name}': ${filtered.length} results, ${timelineEvents.length} timeline events`
+    `OSINT complete for '${name}': ${filtered.length} results, ${timelineEvents.length} timeline events, deep=${deepSearch}`
   );
 
   return {
@@ -145,9 +239,12 @@ export async function runOsintWithProgress(
       totalResultsScanned: combined.length,
       totalResultsFiltered: filtered.length,
       searchTimestamp: new Date().toISOString(),
-      sourcesQueried: queries.length,
+      sourcesQueried: totalQueries,
       averageRelevanceScore: Math.round(avgScore),
-      queryVariantsUsed: queries.length,
+      queryVariantsUsed: totalQueries,
+      deepSearch,
+      searchRounds,
+      contentEnrichedCount,
     },
   };
 }

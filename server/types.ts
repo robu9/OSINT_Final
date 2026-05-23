@@ -9,6 +9,9 @@ export interface SearchResult {
   matchMethod?: string;
   relevanceScore?: number;
   confidence?: number;
+  pageContent?: string;
+  sourceTags?: string[];
+  queryPriority?: number;
 }
 
 export interface Entity {
@@ -79,6 +82,9 @@ export interface SearchMeta {
   sourcesQueried: number;
   averageRelevanceScore?: number;
   queryVariantsUsed?: number;
+  deepSearch?: boolean;
+  searchRounds?: number;
+  contentEnrichedCount?: number;
 }
 
 export interface OsintResult {

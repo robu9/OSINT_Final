@@ -260,18 +260,35 @@ export async function gemmaRerankResults(
     return candidates;
   }
 
-  const topCandidates = candidates.slice(0, 20);
-  const listing = topCandidates
+  const batchSize = 30;
+  const toRank = candidates.slice(0, batchSize);
+  const remainder = candidates.slice(batchSize);
+
+  const listing = toRank
     .map(
       (r, i) =>
-        `[${i}] source=${r.source} title="${r.title}" snippet="${r.snippet.slice(0, 180)}"`
+        `[${i}] source=${r.source} score=${r.relevanceScore ?? 0} title="${r.title}" snippet="${(r.snippet || "").slice(0, 220)}"`
     )
     .join("\n");
 
-  const prompt = `Target person: "${name}" in "${city}".
-For each indexed result below, decide if it likely refers to the SAME person.
-Return JSON: {"keep": [array of index numbers to keep], "reason": "brief note"}
-Only keep results with strong identity match (name + context). Be strict to avoid false positives.
+  const prompt = `You are an OSINT analyst verifying identity matches.
+
+Target person: "${name}"${city ? ` in "${city}"` : ""}.
+
+For EACH indexed result, decide if it refers to the SAME individual (not a homonym).
+Return JSON with this exact shape:
+{
+  "ranked": [
+    {"index": 0, "match": true, "score": 92, "reason": "LinkedIn profile with full name match"},
+    {"index": 1, "match": false, "score": 15, "reason": "Different person with similar name"}
+  ]
+}
+
+Rules:
+- Be strict: only match=true when name AND context align with the target.
+- score is 0-100 for identity confidence (independent of source type).
+- Include ALL indices from 0 to ${toRank.length - 1}.
+- Sort "ranked" by score descending.
 
 Results:
 ${listing}`;
@@ -281,27 +298,73 @@ ${listing}`;
       const genAI = new GoogleGenerativeAI(key);
       const model = genAI.getGenerativeModel({
         model: modelName,
-        generationConfig: { temperature: 0.1 },
+        generationConfig: { temperature: 0.05 },
       });
 
       const resp = await model.generateContent(prompt);
       const raw = extractModelText(resp);
       const extracted = extractJsonObject(raw) ?? cleanJsonResponse(raw);
       const parsed = JSON.parse(extracted) as {
-        keep?: number[];
+        ranked?: Array<{ index: number; match?: boolean; score?: number; reason?: string }>;
       };
 
-      if (Array.isArray(parsed.keep) && parsed.keep.length > 0) {
-        const kept = parsed.keep
-          .filter((i) => i >= 0 && i < topCandidates.length)
-          .map((i) => topCandidates[i]);
+      if (!Array.isArray(parsed.ranked) || parsed.ranked.length === 0) break;
 
-        const remainder = candidates.slice(topCandidates.length);
-        return [...kept, ...remainder];
+      const rankedResults: SearchResult[] = [];
+      const seen = new Set<number>();
+
+      const sortedEntries = [...parsed.ranked].sort(
+        (a, b) => (b.score ?? 0) - (a.score ?? 0)
+      );
+
+      for (const entry of sortedEntries) {
+        if (seen.has(entry.index)) continue;
+        if (entry.index < 0 || entry.index >= toRank.length) continue;
+        seen.add(entry.index);
+
+        if (entry.match === false && (entry.score ?? 0) < 40) continue;
+
+        const result = { ...toRank[entry.index] };
+        const aiScore = Math.round(Math.min(100, Math.max(0, entry.score ?? 0)));
+
+        if (entry.match !== false) {
+          result.relevanceScore = Math.round(
+            (result.relevanceScore ?? 0) * 0.45 + aiScore * 0.55
+          );
+          result.confidence = Math.max(result.confidence ?? 0, aiScore);
+          result.matchMethod = entry.reason
+            ? `AI Verified: ${entry.reason.slice(0, 60)}`
+            : "AI Verified Match";
+        } else {
+          result.relevanceScore = Math.round(
+            Math.min(result.relevanceScore ?? 0, aiScore)
+          );
+          result.matchMethod = entry.reason
+            ? `AI Rejected: ${entry.reason.slice(0, 60)}`
+            : "AI Low Confidence";
+        }
+
+        if ((result.relevanceScore ?? 0) >= 32) {
+          rankedResults.push(result);
+        }
       }
-      break;
-    } catch {
-      // fall back to heuristic ranking
+
+      for (let i = 0; i < toRank.length; i++) {
+        if (!seen.has(i)) {
+          const fallback = toRank[i];
+          if ((fallback.relevanceScore ?? 0) >= 50) {
+            rankedResults.push(fallback);
+          }
+        }
+      }
+
+      rankedResults.sort(
+        (a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0)
+      );
+
+      return [...rankedResults, ...remainder];
+    } catch (error) {
+      console.warn("AI rerank failed, using heuristic ranking:", error);
       break;
     }
   }

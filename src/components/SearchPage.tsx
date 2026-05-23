@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardHeader,
@@ -97,6 +98,8 @@ const getSourceColor = (source: string) => {
     case "Developer": return "bg-emerald-500";
     case "News": return "bg-yellow-500";
     case "Government": return "bg-slate-500";
+    case "Deep/Variant": return "bg-violet-500";
+    case "Deep/Follow-up": return "bg-fuchsia-500";
     default: return "bg-purple-500";
   }
 };
@@ -115,6 +118,8 @@ const getSourceIcon = (source: string) => {
     case "Developer": return "👨‍💻";
     case "News": return "📰";
     case "Government": return "🏛️";
+    case "Deep/Variant": return "🔬";
+    case "Deep/Follow-up": return "🎯";
     default: return "🌐";
   }
 };
@@ -123,7 +128,7 @@ const SearchPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({ name: "", city: "", extraTerms: "" });
+  const [formData, setFormData] = useState({ name: "", city: "", extraTerms: "", deepSearch: true });
   const [isSearching, setIsSearching] = useState(false);
   const [hasResults, setHasResults] = useState(false);
   const [personData, setPersonData] = useState<any>(null);
@@ -248,7 +253,7 @@ const SearchPage = () => {
   const startNewSearch = () => {
     setHasResults(false);
     setPersonData(null);
-    setFormData({ name: "", city: "", extraTerms: "" });
+    setFormData({ name: "", city: "", extraTerms: "", deepSearch: true });
     setActiveTab("overview");
   };
 
@@ -340,13 +345,26 @@ const SearchPage = () => {
                       placeholder="e.g., CEO, TechCorp, lawsuit"
                     />
                   </div>
+                  <div className="flex items-center justify-between rounded-lg border border-purple-400/30 bg-gray-800/40 px-5 py-4">
+                    <div>
+                      <Label htmlFor="deepSearch" className="text-purple-200 text-lg">Deep Search</Label>
+                      <p className="text-sm text-purple-200/60 mt-1">
+                        Multi-round queries, name variants, page content extraction, and AI re-ranking
+                      </p>
+                    </div>
+                    <Switch
+                      id="deepSearch"
+                      checked={formData.deepSearch}
+                      onCheckedChange={(checked) => setFormData({ ...formData, deepSearch: checked })}
+                    />
+                  </div>
                   <Button
                     onClick={handleSearch}
                     disabled={!formData.name}
                     className="w-full !mt-10 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-400 hover:to-violet-500 text-white font-bold py-4 text-xl rounded-lg"
                   >
                     <Search className="w-6 h-6 mr-3" />
-                    Initiate Search
+                    {formData.deepSearch ? "Initiate Deep Search" : "Initiate Search"}
                   </Button>
                 </CardContent>
               </Card>
@@ -594,6 +612,26 @@ const SearchPage = () => {
                                 <span className="text-purple-200/60">Sources queried</span>
                                 <span className="text-purple-200 font-medium">{personData.searchMeta.sourcesQueried}</span>
                               </div>
+                              {personData.searchMeta.averageRelevanceScore != null && (
+                                <div className="flex justify-between">
+                                  <span className="text-purple-200/60">Avg. relevance</span>
+                                  <span className="text-purple-200 font-medium">{personData.searchMeta.averageRelevanceScore}%</span>
+                                </div>
+                              )}
+                              {personData.searchMeta.deepSearch && (
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="text-purple-200/60">Search rounds</span>
+                                    <span className="text-purple-200 font-medium">{personData.searchMeta.searchRounds || 1}</span>
+                                  </div>
+                                  {personData.searchMeta.contentEnrichedCount != null && (
+                                    <div className="flex justify-between">
+                                      <span className="text-purple-200/60">Pages fetched</span>
+                                      <span className="text-purple-200 font-medium">{personData.searchMeta.contentEnrichedCount}</span>
+                                    </div>
+                                  )}
+                                </>
+                              )}
                               <div className="flex justify-between">
                                 <span className="text-purple-200/60">Timestamp</span>
                                 <span className="text-purple-200 font-medium">
@@ -881,6 +919,11 @@ const SearchPage = () => {
                                   {item.relevanceScore != null && (
                                     <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 rounded text-purple-300">
                                       Score: {item.relevanceScore}
+                                    </span>
+                                  )}
+                                  {item.confidence != null && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-green-500/15 rounded text-green-300">
+                                      {item.confidence}% conf.
                                     </span>
                                   )}
                                 </div>

@@ -1,26 +1,85 @@
 export function sanitizeInput(text: string): string {
   if (!text) return "";
-  return text.replace(/[^\w\s\-.,']/g, "").trim().slice(0, 200);
+  return text
+    .replace(/[^\p{L}\p{N}\s\-.,']/gu, "")
+    .trim()
+    .slice(0, 200);
 }
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function mergeAndDedupe(listOfLists: Array<Array<{ link: string }>>): Array<{ link: string }> {
-  const seen = new Set<string>();
-  const out: Array<{ link: string }> = [];
+interface MergeableResult {
+  link: string;
+  title?: string;
+  snippet?: string;
+  source?: string;
+  sourceTags?: string[];
+  queryPriority?: number;
+  pagemap?: Record<string, unknown>;
+  displayLink?: string;
+}
+
+export function mergeAndDedupe<T extends MergeableResult>(listOfLists: T[][]): T[] {
+  const byLink = new Map<string, T>();
 
   for (const sub of listOfLists) {
     for (const r of sub) {
       const link = r.link || "";
-      if (link && !seen.has(link)) {
-        seen.add(link);
-        out.push(r);
+      if (!link) continue;
+
+      const existing = byLink.get(link);
+      if (!existing) {
+        byLink.set(link, {
+          ...r,
+          sourceTags: r.sourceTags?.length
+            ? [...new Set(r.sourceTags)]
+            : r.source
+              ? [r.source]
+              : [],
+        });
+        continue;
       }
+
+      const mergedTags = new Set([
+        ...(existing.sourceTags || []),
+        ...(r.sourceTags || []),
+        ...(existing.source ? [existing.source] : []),
+        ...(r.source ? [r.source] : []),
+      ]);
+
+      const bestPriority = Math.min(
+        existing.queryPriority ?? 99,
+        r.queryPriority ?? 99
+      );
+
+      const longerSnippet =
+        (r.snippet?.length || 0) > (existing.snippet?.length || 0)
+          ? r.snippet
+          : existing.snippet;
+
+      byLink.set(link, {
+        ...existing,
+        ...r,
+        title: existing.title || r.title,
+        snippet: longerSnippet || existing.snippet || r.snippet,
+        source: existing.queryPriority !== undefined &&
+          (r.queryPriority ?? 99) < (existing.queryPriority ?? 99)
+          ? r.source || existing.source
+          : existing.source || r.source,
+        sourceTags: [...mergedTags],
+        queryPriority: bestPriority,
+        pagemap: existing.pagemap || r.pagemap,
+      });
     }
   }
-  return out;
+
+  return [...byLink.values()].sort((a, b) => {
+    const priorityDiff = (a.queryPriority ?? 99) - (b.queryPriority ?? 99);
+    if (priorityDiff !== 0) return priorityDiff;
+    return (b.sourceTags?.length || 0) - (a.sourceTags?.length || 0);
+  });
 }
 
 export function buildNameVariants(name: string): string[] {

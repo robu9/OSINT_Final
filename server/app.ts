@@ -91,6 +91,7 @@ export function createApp(): express.Application {
     const city = String(data.city || "").trim();
     const extrasRaw = String(data.extraTerms || "").trim();
     const extras = extrasRaw.split(",").map((e: string) => e.trim()).filter(Boolean);
+    const deepSearch = data.deepSearch !== false;
 
     if (!name) {
       res.status(400).json({ error: "Name is a required field." });
@@ -121,7 +122,7 @@ export function createApp(): express.Application {
     (async () => {
       try {
         console.log(`Search started: ${searchId}`);
-        const result = await runOsintWithProgress(name, city, extras, searchId);
+        const result = await runOsintWithProgress(name, city, extras, searchId, deepSearch);
         progressStore[searchId] = {
           ...progressStore[searchId],
           percentage: 100,
