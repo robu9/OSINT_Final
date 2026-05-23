@@ -13,14 +13,12 @@ import {
 import {
   Search,
   ArrowLeft,
-  FileText,
   User,
   Loader2,
   ShieldAlert,
   TrendingUp,
   BarChart,
   CalendarClock,
-  Database,
   Globe,
   Lightbulb,
   Users,
@@ -30,8 +28,19 @@ import {
   Download,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   Info,
+  Link2,
+  Briefcase,
+  Scale,
+  Newspaper,
+  MessageSquare,
+  BookOpen,
+  GraduationCap,
+  Share2,
+  Code2,
+  Landmark,
+  Microscope,
+  Target,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -104,23 +113,34 @@ const getSourceColor = (source: string) => {
   }
 };
 
-const getSourceIcon = (source: string) => {
+const getSourceLabel = (source: string) => {
   switch (source) {
-    case "LinkedIn": return "🔗";
-    case "Professional": return "💼";
-    case "Case/Legal": return "⚖️";
-    case "Case/News": return "📰";
-    case "Reddit": return "💬";
-    case "Wikipedia": return "📚";
-    case "Business": return "🏢";
-    case "Academic": return "🎓";
-    case "Social": return "🐦";
-    case "Developer": return "👨‍💻";
-    case "News": return "📰";
-    case "Government": return "🏛️";
-    case "Deep/Variant": return "🔬";
-    case "Deep/Follow-up": return "🎯";
-    default: return "🌐";
+    case "Case/Legal": return "Legal Records";
+    case "Case/News": return "News Coverage";
+    case "Deep/Variant": return "Extended Search";
+    case "Deep/Follow-up": return "Additional Sources";
+    default: return source;
+  }
+};
+
+const getSourceIcon = (source: string) => {
+  const iconClass = "w-3.5 h-3.5 text-purple-400";
+  switch (source) {
+    case "LinkedIn": return <Link2 className={iconClass} />;
+    case "Professional": return <Briefcase className={iconClass} />;
+    case "Case/Legal": return <Scale className={iconClass} />;
+    case "Case/News": return <Newspaper className={iconClass} />;
+    case "Reddit": return <MessageSquare className={iconClass} />;
+    case "Wikipedia": return <BookOpen className={iconClass} />;
+    case "Business": return <Building2 className={iconClass} />;
+    case "Academic": return <GraduationCap className={iconClass} />;
+    case "Social": return <Share2 className={iconClass} />;
+    case "Developer": return <Code2 className={iconClass} />;
+    case "News": return <Newspaper className={iconClass} />;
+    case "Government": return <Landmark className={iconClass} />;
+    case "Deep/Variant": return <Microscope className={iconClass} />;
+    case "Deep/Follow-up": return <Target className={iconClass} />;
+    default: return <Globe className={iconClass} />;
   }
 };
 
@@ -157,12 +177,6 @@ const SearchPage = () => {
     }
     return () => clearInterval(quoteInterval);
   }, [isSearching]);
-
-  useEffect(() => {
-    if (personData) {
-      console.log("--- Full Backend Response ---", personData);
-    }
-  }, [personData]);
 
   // --- API Interaction Logic ---
 
@@ -241,7 +255,7 @@ const SearchPage = () => {
         // Trigger download
         const downloadUrl = `${API_BASE_URL}/download-report/${data.filename}`;
         window.open(downloadUrl, "_blank");
-        toast({ title: "Report Generated", description: `Report saved as ${data.filename}` });
+        toast({ title: "Report Generated", description: "Your intelligence report is ready for download." });
       } else {
         toast({ title: "Error", description: data.error || "Failed to generate report", variant: "destructive" });
       }
@@ -262,7 +276,7 @@ const SearchPage = () => {
     personData?.sourceAnalysis
       ?.filter((s: any) => s.count > 0)
       ?.map((source: any) => ({
-        subject: source.name,
+        subject: getSourceLabel(source.name),
         A: source.count,
         fullMark: Math.max(...personData.sourceAnalysis.map((s: any) => s.count), 0) + 5,
       })) || [];
@@ -273,7 +287,7 @@ const SearchPage = () => {
     { id: "findings", label: "Key Findings", icon: <Lightbulb className="w-4 h-4" /> },
     { id: "entities", label: "Entities", icon: <Users className="w-4 h-4" /> },
     { id: "timeline", label: "Timeline", icon: <CalendarClock className="w-4 h-4" /> },
-    { id: "rawdata", label: "Raw Data", icon: <Database className="w-4 h-4" /> },
+    { id: "sources", label: "Sources", icon: <Globe className="w-4 h-4" /> },
   ];
 
   return (
@@ -349,7 +363,7 @@ const SearchPage = () => {
                     <div>
                       <Label htmlFor="deepSearch" className="text-purple-200 text-lg">Deep Search</Label>
                       <p className="text-sm text-purple-200/60 mt-1">
-                        Multi-round queries, name variants, page content extraction, and AI re-ranking
+                        Expanded queries, name variants, and deeper source coverage
                       </p>
                     </div>
                     <Switch
@@ -495,12 +509,12 @@ const SearchPage = () => {
                           </Card>
                         </div>
 
-                        {/* AI Summary */}
+                        {/* Intelligence Summary */}
                         <Card className="bg-gray-900/70 backdrop-blur-md border border-purple-400/30">
                           <CardHeader className="pb-3">
                             <CardTitle className="flex items-center text-lg text-purple-300">
                               <Info className="w-5 h-5 mr-2" />
-                              AI Intelligence Summary
+                              Intelligence Summary
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
@@ -584,7 +598,7 @@ const SearchPage = () => {
                                 <div key={i} className="flex items-center justify-between text-xs">
                                   <div className="flex items-center gap-2">
                                     <div className={`w-2.5 h-2.5 rounded-full ${getSourceColor(source.name)}`} />
-                                    <span className="text-purple-200/80">{getSourceIcon(source.name)} {source.name}</span>
+                                    <span className="text-purple-200/80 flex items-center gap-1.5">{getSourceIcon(source.name)} {getSourceLabel(source.name)}</span>
                                   </div>
                                   <span className="text-purple-300 font-medium">{source.count}</span>
                                 </div>
@@ -593,49 +607,21 @@ const SearchPage = () => {
                           </CardContent>
                         </Card>
 
-                        {/* Search Stats */}
+                        {/* Investigation Summary */}
                         {personData.searchMeta && (
                           <Card className="bg-gray-900/70 backdrop-blur-md border border-purple-400/30">
                             <CardHeader className="pb-2">
-                              <CardTitle className="text-sm text-purple-300">Search Statistics</CardTitle>
+                              <CardTitle className="text-sm text-purple-300">Investigation Summary</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 text-xs">
                               <div className="flex justify-between">
-                                <span className="text-purple-200/60">Results scanned</span>
-                                <span className="text-purple-200 font-medium">{personData.searchMeta.totalResultsScanned}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-purple-200/60">Relevant matches</span>
+                                <span className="text-purple-200/60">Sources analyzed</span>
                                 <span className="text-purple-200 font-medium">{personData.searchMeta.totalResultsFiltered}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-purple-200/60">Sources queried</span>
-                                <span className="text-purple-200 font-medium">{personData.searchMeta.sourcesQueried}</span>
-                              </div>
-                              {personData.searchMeta.averageRelevanceScore != null && (
-                                <div className="flex justify-between">
-                                  <span className="text-purple-200/60">Avg. relevance</span>
-                                  <span className="text-purple-200 font-medium">{personData.searchMeta.averageRelevanceScore}%</span>
-                                </div>
-                              )}
-                              {personData.searchMeta.deepSearch && (
-                                <>
-                                  <div className="flex justify-between">
-                                    <span className="text-purple-200/60">Search rounds</span>
-                                    <span className="text-purple-200 font-medium">{personData.searchMeta.searchRounds || 1}</span>
-                                  </div>
-                                  {personData.searchMeta.contentEnrichedCount != null && (
-                                    <div className="flex justify-between">
-                                      <span className="text-purple-200/60">Pages fetched</span>
-                                      <span className="text-purple-200 font-medium">{personData.searchMeta.contentEnrichedCount}</span>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                              <div className="flex justify-between">
-                                <span className="text-purple-200/60">Timestamp</span>
+                                <span className="text-purple-200/60">Completed</span>
                                 <span className="text-purple-200 font-medium">
-                                  {new Date(personData.searchMeta.searchTimestamp).toLocaleTimeString()}
+                                  {new Date(personData.searchMeta.searchTimestamp).toLocaleString()}
                                 </span>
                               </div>
                             </CardContent>
@@ -688,7 +674,7 @@ const SearchPage = () => {
                             <Lightbulb className="w-5 h-5 mr-2" />
                             Key Findings
                           </CardTitle>
-                          <CardDescription className="text-purple-200/60">AI-extracted insights from the data</CardDescription>
+                          <CardDescription className="text-purple-200/60">Notable insights gathered from public sources</CardDescription>
                         </CardHeader>
                         <CardContent>
                           {personData.keyFindings?.length > 0 ? (
@@ -706,7 +692,7 @@ const SearchPage = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Associated Entities from AI */}
+                      {/* Associated Entities */}
                       <Card className="bg-gray-900/70 backdrop-blur-md border border-purple-400/30">
                         <CardHeader>
                           <CardTitle className="flex items-center text-xl text-purple-300">
@@ -725,7 +711,7 @@ const SearchPage = () => {
                                     {entity.type === "organization" && <Building2 className="w-3.5 h-3.5 text-teal-400" />}
                                     {entity.type === "location" && <MapPin className="w-3.5 h-3.5 text-amber-400" />}
                                     <span className="text-purple-200 font-medium text-sm">{entity.name}</span>
-                                    <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 rounded text-purple-300">{entity.type}</span>
+                                    <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 rounded text-purple-300 capitalize">{entity.type}</span>
                                   </div>
                                   <p className="text-xs text-purple-200/60 ml-5">{entity.relationship}</p>
                                 </div>
@@ -851,7 +837,7 @@ const SearchPage = () => {
                                     <p className="text-purple-100/90">{event.title}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                       <span className={`text-xs font-semibold px-2 py-0.5 inline-block rounded-full text-white ${getSourceColor(event.source)}`}>
-                                        {event.source}
+                                        {getSourceLabel(event.source)}
                                       </span>
                                       {event.link && (
                                         <a href={event.link} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:underline flex items-center gap-1">
@@ -876,17 +862,17 @@ const SearchPage = () => {
                   </motion.div>
                 )}
 
-                {/* ───── RAW DATA TAB ───── */}
-                {activeTab === "rawdata" && (
-                  <motion.div key="rawdata" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                {/* ───── SOURCES TAB ───── */}
+                {activeTab === "sources" && (
+                  <motion.div key="sources" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                     <Card className="bg-gray-900/70 backdrop-blur-md border border-purple-400/30">
                       <CardHeader>
                         <CardTitle className="flex items-center text-2xl text-purple-300">
-                          <Database className="w-6 h-6 mr-3" />
-                          Raw Intelligence Data
+                          <Globe className="w-6 h-6 mr-3" />
+                          Source References
                         </CardTitle>
                         <CardDescription className="text-purple-200/60">
-                          All {personData.raw_data?.length || 0} data points gathered for this investigation
+                          {personData.raw_data?.length || 0} public sources referenced in this investigation
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -907,25 +893,11 @@ const SearchPage = () => {
                                     <p className="text-xs text-purple-300/40 mt-1">{item.displayLink}</p>
                                   )}
                                 </div>
-                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  {getSourceIcon(item.source)}
                                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full text-white ${getSourceColor(item.source)}`}>
-                                    {item.source}
+                                    {getSourceLabel(item.source)}
                                   </span>
-                                  {item.matchMethod && (
-                                    <span className="text-xs px-1.5 py-0.5 bg-gray-700/60 rounded text-purple-300/60">
-                                      {item.matchMethod}
-                                    </span>
-                                  )}
-                                  {item.relevanceScore != null && (
-                                    <span className="text-xs px-1.5 py-0.5 bg-purple-500/20 rounded text-purple-300">
-                                      Score: {item.relevanceScore}
-                                    </span>
-                                  )}
-                                  {item.confidence != null && (
-                                    <span className="text-xs px-1.5 py-0.5 bg-green-500/15 rounded text-green-300">
-                                      {item.confidence}% conf.
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                               <div className="mt-2">
@@ -936,7 +908,7 @@ const SearchPage = () => {
                             </motion.div>
                           ))
                         ) : (
-                          <p className="text-purple-200/70 text-center py-12">No raw data available.</p>
+                          <p className="text-purple-200/70 text-center py-12">No sources available.</p>
                         )}
                       </CardContent>
                     </Card>

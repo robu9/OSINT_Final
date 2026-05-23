@@ -105,7 +105,7 @@ export async function runOsintWithProgress(
     `Starting OSINT for: name='${name}', city='${city}', extras='${extras.join(", ")}', deep=${deepSearch}`
   );
 
-  updateProgress(searchId, 5, deepSearch ? "🔍 Building deep search query plan..." : "🔍 Building search queries...");
+  updateProgress(searchId, 5, deepSearch ? "Building search query plan..." : "Building search queries...");
   await sleep(50);
 
   const round1Queries = buildAdvancedQueries(name, city, extras, deepSearch);
@@ -114,7 +114,7 @@ export async function runOsintWithProgress(
   updateProgress(
     searchId,
     10,
-    `🌐 Round 1: Running ${round1Queries.length} targeted searches...`
+    "Running targeted searches..."
   );
 
   const round1Batches = await runParallelSearches(round1Queries, geoCode, deepSearch);
@@ -122,7 +122,7 @@ export async function runOsintWithProgress(
   console.log(`Round 1 unique results: ${combined.length}`);
 
   if (deepSearch && combined.length > 0) {
-    updateProgress(searchId, 35, "🧠 Analyzing results for follow-up queries...");
+    updateProgress(searchId, 35, "Analyzing results for follow-up queries...");
     enrichWithNlp(combined);
     const preliminary = filterAndRankResults(combined, name, city, extras);
     const signals = extractFollowUpSignals(preliminary, name);
@@ -141,7 +141,7 @@ export async function runOsintWithProgress(
       updateProgress(
         searchId,
         42,
-        `🔎 Round 2: Running ${followUpQueries.length} follow-up deep searches...`
+        "Running follow-up searches..."
       );
 
       const round2Batches = await runParallelSearches(followUpQueries, geoCode, true);
@@ -150,7 +150,7 @@ export async function runOsintWithProgress(
     }
   }
 
-  updateProgress(searchId, 52, "🔄 Merging and deduplicating results...");
+  updateProgress(searchId, 52, "Merging and deduplicating results...");
 
   if (combined.length === 0) {
     return emptyResult(
@@ -161,11 +161,11 @@ export async function runOsintWithProgress(
     );
   }
 
-  updateProgress(searchId, 58, "🧠 Running NLP entity recognition...");
+  updateProgress(searchId, 58, "Running entity recognition...");
   enrichWithNlp(combined);
 
   if (deepSearch) {
-    updateProgress(searchId, 62, "📄 Fetching full page content for top results...");
+    updateProgress(searchId, 62, "Fetching full page content...");
     const beforeEnrich = combined.length;
     await enrichResultsWithPageContent(combined, 20);
     contentEnrichedCount = combined.filter((r) => r.pageContent).length;
@@ -173,7 +173,7 @@ export async function runOsintWithProgress(
     enrichWithNlp(combined);
   }
 
-  updateProgress(searchId, 70, "🎯 Scoring identity relevance...");
+  updateProgress(searchId, 70, "Scoring identity relevance...");
   let filtered = filterAndRankResults(combined, name, city, extras);
 
   if (filtered.length === 0) {
@@ -186,26 +186,26 @@ export async function runOsintWithProgress(
     );
   }
 
-  updateProgress(searchId, 78, "🤖 AI re-ranking with Gemma 4 31B...");
+  updateProgress(searchId, 78, "Enhancing result relevance...");
   filtered = await gemmaRerankResults(name, city, filtered);
 
-  updateProgress(searchId, 82, "👤 Extracting profile metadata...");
+  updateProgress(searchId, 82, "Extracting profile metadata...");
   const profileInfo = extractProfileInfo(filtered);
 
-  updateProgress(searchId, 86, "🔗 Analyzing entity relationships...");
+  updateProgress(searchId, 86, "Analyzing entity relationships...");
   const entityAnalysis = aggregateEntities(filtered, name);
 
-  updateProgress(searchId, 90, "🤖 Running Gemma 4 31B intelligence analysis...");
+  updateProgress(searchId, 90, "Generating intelligence analysis...");
   const aiResult = await gemmaAnalyzeResults(name, city, filtered);
 
-  updateProgress(searchId, 95, "📅 Building evidence timeline...");
+  updateProgress(searchId, 95, "Building evidence timeline...");
   const timelineEvents = buildTimeline(filtered);
 
   const sourceAnalysis = buildSourceAnalysis(filtered);
   const avgScore =
     filtered.reduce((sum, r) => sum + (r.relevanceScore || 0), 0) / filtered.length;
 
-  updateProgress(searchId, 97, "📦 Packaging results...");
+  updateProgress(searchId, 97, "Packaging results...");
 
   const raw_data = filtered.map((r) => ({
     title: r.title,

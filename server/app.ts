@@ -5,8 +5,8 @@ import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import { initGoogleKeys, getGoogleKeyCount } from "./googleSearch.js";
-import { initGeminiKeys, getGeminiKeyCount, getModelName } from "./aiAnalysis.js";
+import { initGoogleKeys } from "./googleSearch.js";
+import { initGeminiKeys } from "./aiAnalysis.js";
 import { progressStore, runOsintWithProgress } from "./osintService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,25 +57,12 @@ export function createApp(): express.Application {
       status: "online",
       service: "OSINT Investigator API",
       version: "3.0",
-      runtime: "TypeScript/Node.js",
-      aiModel: getModelName(),
-      endpoints: {
-        "POST /api/osint": "Start an OSINT search",
-        "GET /api/progress/:searchId": "Poll search progress",
-        "POST /api/generate-report": "Generate a JSON report",
-        "GET /api/health": "Health check",
-      },
     });
   });
 
   api.get("/health", (_req, res) => {
     res.json({
       status: "healthy",
-      runtime: "typescript",
-      aiModel: getModelName(),
-      googleKeys: getGoogleKeyCount(),
-      gemmaKeys: getGeminiKeyCount(),
-      activeSearches: Object.values(progressStore).filter((v) => v.status === "running").length,
       timestamp: new Date().toISOString(),
     });
   });
@@ -126,7 +113,7 @@ export function createApp(): express.Application {
         progressStore[searchId] = {
           ...progressStore[searchId],
           percentage: 100,
-          stage: "✅ Search complete!",
+          stage: "Search complete!",
           status: "completed",
           result,
           _finishedAt: Date.now(),
@@ -139,7 +126,7 @@ export function createApp(): express.Application {
           ...progressStore[searchId],
           status: "error",
           error: errorMsg,
-          stage: "❌ Search failed",
+          stage: "Search failed",
           _finishedAt: Date.now(),
         };
         console.error(`Search failed: ${searchId} — ${errorMsg}`);
@@ -200,7 +187,6 @@ export function createApp(): express.Application {
         reportMeta: {
           generatedAt: new Date().toISOString(),
           toolVersion: "3.0",
-          aiModel: getModelName(),
           subject: personData.name || "Unknown",
           location: personData.location || "",
         },
@@ -213,8 +199,13 @@ export function createApp(): express.Application {
         entityRelationships: personData.entityAnalysis,
         sourceBreakdown: personData.sourceAnalysis,
         timeline: personData.timelineEvents,
-        rawIntelligence: personData.raw_data,
-        searchStatistics: personData.searchMeta,
+        sources: personData.raw_data?.map(({ title, snippet, link, source, displayLink }: {
+          title: string;
+          snippet: string;
+          link: string;
+          source: string;
+          displayLink?: string;
+        }) => ({ title, snippet, link, source, displayLink })),
       };
 
       fs.writeFileSync(filepath, JSON.stringify(report, null, 2), "utf-8");

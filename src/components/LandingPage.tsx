@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
+import { Brain, Shield, Lock, Sparkles } from 'lucide-react';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -56,12 +57,12 @@ const LandingPage = () => {
         <div className="container mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center max-w-6xl mx-auto">
             
-            {/* Left Side - Brain Animation */}
+            {/* Left Side - Hero Icon */}
             <div className="flex flex-col items-center space-y-8">
               <div className="relative">
                 <div className="w-96 h-96 bg-gradient-to-br from-purple-500/20 to-violet-600/20 rounded-full flex items-center justify-center border-2 border-purple-400/40 pulse-border-purple backdrop-blur-sm">
                   <div className="w-80 h-80 bg-purple-400/10 rounded-full flex items-center justify-center float backdrop-blur-sm">
-                    <div className="text-9xl filter drop-shadow-lg">🧠</div>
+                    <Brain className="w-40 h-40 text-purple-300 drop-shadow-lg" strokeWidth={1.25} />
                   </div>
                 </div>
                 <div className="absolute -top-4 -right-4 w-8 h-8 bg-purple-400 rounded-full opacity-60 animate-ping"></div>
@@ -94,16 +95,16 @@ const LandingPage = () => {
 
               <div className="space-y-4 bg-slate-800/30 backdrop-blur-sm border border-purple-400/20 rounded-lg p-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                  <Shield className="w-4 h-4 text-purple-400" />
                   <span className="text-purple-200/80">Responsible Data Analysis</span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                  <Lock className="w-4 h-4 text-purple-400" />
                   <span className="text-purple-200/80">Privacy-First Approach</span>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                  <span className="text-purple-200/80">AI-Powered Insights</span>
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span className="text-purple-200/80">Intelligence Insights</span>
                 </div>
               </div>
             </div>
